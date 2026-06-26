@@ -8,11 +8,15 @@
 #include "MCP_ADC.h"
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
+#include "CAN_BUS/MegasquirtDecoder.h"
 
-VehicleData vehicleData;
-VehicleData vehicleDataBuffer; // For double-buffering
+VehicleData vehicleOutputData;  //Final data to be sent over CAN bus
+VehicleData vehicleDataOutputBuffer; // For double buffering output data
+VehicleData vehicleInputData;   // Data received from CAN bus
+VehicleData vehicleInputDataReadBuffer;   // Data received from CAN bus
 CANBus canBus;
 CANIODataEncoder ioEncoder;
+MegasquirtDecoder msDecoder(vehicleInputData);
 MCP3204 adc;
 SemaphoreHandle_t vehicleDataMutex = NULL;
 
@@ -26,11 +30,32 @@ void printDiagnostics();
 volatile uint32_t vssPulseCount = 0;
 unsigned long lastPollMillis = 0;
 unsigned long lastTransmitMillis = 0;
+unsigned long lastReceiveMillis = 0;
 unsigned long lastDiagnosticsMillis = 0;
 
 void IRAM_ATTR onVssPulse()
 {
   vssPulseCount +=1;
+}
+
+// ----------------- CAN Task -----------------
+void canRecieveTask(void *param)
+{
+  while (true)
+  {
+    twai_message_t msg;
+    if (canBus.receiveMessage(msg))
+    {
+      // Route to correct decoder
+      if (msg.identifier >= 0x5E8 && msg.identifier <= 0x5EA)
+        msDecoder.processFrame(msg);
+
+      // Atomic update for UI
+      vehicleInputDataReadBuffer = vehicleInputData;
+    }
+
+    vTaskDelay(pdMS_TO_TICKS(RECEIVE_RATE_MS)); // ms delay
+  }
 }
 
 void setup()
@@ -47,6 +72,7 @@ void setup()
       ;
   }
 
+  // Configure GPIO pins for digital inputs
   pinMode(DIGITAL0_GPIO, INPUT);
   pinMode(DIGITAL1_GPIO, INPUT);
   pinMode(DIGITAL2_GPIO, INPUT);
@@ -64,26 +90,49 @@ void setup()
   SPI.begin();
   adc.begin(SPI_CS);
   
+  //Setup interrupt for VSS pulse counting
+  pinMode(VSS_GPIO, INPUT);
   attachInterrupt(VSS_GPIO, onVssPulse, RISING);
+
+    // Create CAN task pinned to core 0
+  xTaskCreatePinnedToCore(
+      canRecieveTask, // Task function
+      "CAN Task",     // Name
+      4096,           // Stack size (bytes)
+      NULL,           // Parameter
+      1,              // Priority
+      NULL,           // Task handle
+      0               // Core ID
+  );
+
   Serial.println("Setup complete");
 }
+
 
 void loop()
 {
   unsigned long now = millis();
 
+  // Poll inputs at a fixed rate
   if (now - lastPollMillis >= POLLING_RATE_MS)
   {
     lastPollMillis = now;
     updateInputs();
   }
 
+  //Transmit vehicle data at a fixed rate via CAN bus
   if (now - lastTransmitMillis >= TRANSMIT_RATE_MS)
   {
     lastTransmitMillis = now;
     transmitVehicleData();
   }
 
+  if(now - lastReceiveMillis >= RECEIVE_RATE_MS)
+  {
+    lastReceiveMillis = now;
+  }
+
+  //Output diagnostics to Serial at a fixed rate
   if (now - lastDiagnosticsMillis >= 200)  // Print diagnostics every .2 seconds
   {
     lastDiagnosticsMillis = now;
@@ -95,14 +144,14 @@ void updateInputs()
 {
   if (xSemaphoreTake(vehicleDataMutex, pdMS_TO_TICKS(10)) == pdTRUE)
   {
-    vehicleDataBuffer.rightTurn.boolValue = digitalRead(RIGHT_BLINKER_GPIO);
-    vehicleDataBuffer.leftTurn.boolValue = digitalRead(LEFT_BLINKER_GPIO);
-    vehicleDataBuffer.highBeam.boolValue = digitalRead(HIGH_BEAM_GPIO);
-    vehicleDataBuffer.headlights.boolValue = digitalRead(HEADLIGHTS_GPIO);
-    vehicleDataBuffer.speed.value = calculateSpeedFromVss();
-    vehicleDataBuffer.fuelLevel.value = measureFuel();
-    vehicleDataBuffer.button0.boolValue = digitalRead(BUTTON_0_GPIO);
-    vehicleDataBuffer.button1.boolValue = digitalRead(BUTTON_1_GPIO);
+    vehicleDataOutputBuffer.rightTurn.boolValue = digitalRead(RIGHT_TURN_SIGNAL_GPIO);
+    vehicleDataOutputBuffer.leftTurn.boolValue = digitalRead(LEFT_TURN_SIGNAL_GPIO);
+    vehicleDataOutputBuffer.highBeam.boolValue = digitalRead(HIGH_BEAM_GPIO);
+    vehicleDataOutputBuffer.headlights.boolValue = digitalRead(HEADLIGHTS_GPIO);
+    vehicleDataOutputBuffer.speed.value = calculateSpeedFromVss();
+    vehicleDataOutputBuffer.fuelLevel.value = measureFuel();
+    vehicleDataOutputBuffer.button0.boolValue = digitalRead(BUTTON_0_GPIO);
+    vehicleDataOutputBuffer.button1.boolValue = digitalRead(BUTTON_1_GPIO);
     xSemaphoreGive(vehicleDataMutex);
   }
 }
@@ -111,10 +160,10 @@ void transmitVehicleData()
 {
   if (xSemaphoreTake(vehicleDataMutex, pdMS_TO_TICKS(10)) == pdTRUE)
   {
-    vehicleData = vehicleDataBuffer;
+    vehicleOutputData = vehicleDataOutputBuffer;
     xSemaphoreGive(vehicleDataMutex);
   }
-  ioEncoder.sendFrame(vehicleData, canBus);
+  ioEncoder.sendFrame(vehicleOutputData, canBus);
 }
 
 uint16_t calculateSpeedFromVss()

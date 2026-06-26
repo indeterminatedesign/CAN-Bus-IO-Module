@@ -1,6 +1,6 @@
 
-#define CAN_TX 4   // <-- adjust to your  board
-#define CAN_RX 5    // <-- adjust to your  board
+#define CAN_TX 4   // Physical pin for CAN TX
+#define CAN_RX 5    // Physical pin for CAN RX
 
 #define SPI_CS    	10 		   // SPI slave select
 #define ADC_VREF    3300     // 3.3V Vref
@@ -8,10 +8,11 @@
 #define SPLS        128      // samples
 
 // Interval:
-#define TRANSMIT_RATE_MS 1000
-#define POLLING_RATE_MS 1000
+#define TRANSMIT_RATE_MS 50  //Rate we transmit CAN BUS data
+#define POLLING_RATE_MS 50 //Rate we poll digital and analog inputs
+#define RECEIVE_RATE_MS 50 //Rate we receive CAN BUS data
 
-//Mapping of digital GPIOs for CAN IO Board
+//Mapping of physical ESP32 pins to digital GPIOs for CAN IO Board
 #define DIGITAL0_GPIO 1
 #define DIGITAL1_GPIO 2    
 #define DIGITAL2_GPIO 6
@@ -22,8 +23,9 @@
 #define DIGITAL7_GPIO 16    
 #define DIGITAL8_GPIO 17       
 
-#define RIGHT_BLINKER_GPIO DIGITAL0_GPIO
-#define LEFT_BLINKER_GPIO DIGITAL1_GPIO 
+//MAP GPIOs to a specific function.  For example, we tie the digital input 0 to the right turn signal.  Then when transmitting CAN Bus data we send Digital 0's state as the Right turn signal 
+#define RIGHT_TURN_SIGNAL_GPIO DIGITAL0_GPIO
+#define LEFT_TURN_SIGNAL_GPIO DIGITAL1_GPIO 
 #define HIGH_BEAM_GPIO DIGITAL2_GPIO
 #define HEADLIGHTS_GPIO DIGITAL3_GPIO
 #define VSS_GPIO DIGITAL4_GPIO

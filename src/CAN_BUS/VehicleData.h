@@ -10,6 +10,7 @@ public:
     CANDataField map;
     CANDataField tps;
     CANDataField coolant;
+    CANDataField iat;
     CANDataField afr1;
     CANDataField pw1;
     CANDataField battery;
@@ -26,4 +27,5 @@ public:
 
     VehicleData();
 
+    void swapBuffers(); // optional if you implement double-buffering
 };
