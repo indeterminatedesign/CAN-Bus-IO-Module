@@ -8,8 +8,7 @@ enum class CANDataType
 {
     BOOL, ///< Boolean value (0 or 1)
     U16,  ///< Unsigned 16-bit integer
-    S16,  ///< Signed 16-bit integer
-    Float ///< Floating point value
+    S16   ///< Signed 16-bit integer
 };
 
 /**
@@ -21,8 +20,7 @@ class CANDataField
 {
 public:
     CANDataType type;        ///< The underlying data format in the CAN frame
-    float value = 0.0f;      ///< The processed physical value (scaled)
-    bool boolValue = false;   ///< The boolean value for CANDataType::BOOL fields
+    int32_t value = 0;       ///< The processed physical value (scaled)
     uint32_t lastUpdate = 0; ///< Timestamp (ms) of the last successful decode
 
     // CAN mapping
@@ -58,49 +56,49 @@ public:
      */
     void decode(const uint8_t *data)
     {
-        // Extracts 16 bits (Big-Endian)
-        uint16_t raw = (data[offset] << 8) | data[offset + 1];
-
         switch (type)
         {
         case CANDataType::BOOL:
-            boolValue = (raw != 0);
-            value = boolValue ? 1.0f : 0.0f;
+            value = (data[offset] != 0) ? 1 : 0;
             break;
         case CANDataType::S16:
+        {
+            uint16_t raw = (data[offset] << 8) | data[offset + 1];
             value = ((int16_t)raw) * scale;
             break;
+        }
         case CANDataType::U16:
+        {
+            uint16_t raw = (data[offset] << 8) | data[offset + 1];
             value = raw * scale;
             break;
-        case CANDataType::Float:
-            // Reinterprets the 16-bit raw data as a float bit-pattern
-            value = *((float *)&raw) * scale;
-            break;
         }
+        }
+
         lastUpdate = millis();
     }
-    
+
     void encode(uint8_t *data)
     {
-        uint16_t raw = 0;
         switch (type)
         {
         case CANDataType::BOOL:
-            raw = boolValue ? 1 : 0;
+            data[offset] = (value != 0) ? 1 : 0;
             break;
         case CANDataType::S16:
-            raw = (int16_t)(value / scale);
-            break;
-        case CANDataType::U16:
-            raw = (uint16_t)(value / scale);
-            break;
-        case CANDataType::Float:
-            // Reinterprets the float value as a 16-bit bit-pattern
-            raw = *((uint16_t *)&value);
+        {
+            int16_t raw = (int16_t)(value / scale);
+            data[offset] = (raw >> 8) & 0xFF; // High byte
+            data[offset + 1] = raw & 0xFF;    // Low byte
             break;
         }
-        data[offset] = (raw >> 8) & 0xFF;     // High byte
-        data[offset + 1] = raw & 0xFF;         // Low byte
+        case CANDataType::U16:
+        {
+            uint16_t raw = (uint16_t)(value / scale);
+            data[offset] = (raw >> 8) & 0xFF; // High byte
+            data[offset + 1] = raw & 0xFF;    // Low byte
+            break;
+        }
+        }
     }
 };

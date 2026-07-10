@@ -40,6 +40,14 @@ void CANBus::sendMessage(uint32_t id, uint8_t *data, uint8_t len) {
 
     esp_err_t result = twai_transmit(&tx_msg, pdMS_TO_TICKS(15));
 
+    if(tx_msg.identifier == 0x601) {
+        Serial.printf("TX: ID=0x%03X DLC=%d DATA:", tx_msg.identifier, tx_msg.data_length_code);
+        for (int i = 0; i < tx_msg.data_length_code; i++) {
+            Serial.printf(" %02X", tx_msg.data[i]);
+        }
+        Serial.println();
+    }
+
     if (result == ESP_OK) {
         Serial.printf("✅ TX Success: ID=0x%03X, Len=%d\n", id, len);
     } 
@@ -97,6 +105,7 @@ bool CANBus::receiveMessage(twai_message_t &rx_msg)
 {
     if (twai_receive(&rx_msg, pdMS_TO_TICKS(10)) == ESP_OK)
     {
+        /*
         Serial.printf(
             "RX: ID=0x%03X DLC=%d DATA:",
             rx_msg.identifier,
@@ -107,6 +116,7 @@ bool CANBus::receiveMessage(twai_message_t &rx_msg)
             Serial.printf(" %02X", rx_msg.data[i]);
         }
         Serial.println();
+        */
         return true;
     }
     else

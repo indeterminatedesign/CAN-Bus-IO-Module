@@ -1,4 +1,5 @@
 #include "CANIODataEncoder.h"
+#include <Arduino.h>
 
 CANIODataEncoder::CANIODataEncoder()
 {
@@ -14,7 +15,7 @@ void CANIODataEncoder::sendFrame(VehicleData& data, CANBus& _canBus) {
     // 0x600 - Fuel
     data.fuelLevel.encode(frame600);
     _canBus.sendMessage(0x600, frame600, 8);
-    delayMicroseconds(500); 
+    delayMicroseconds(2); 
 
     // 0x601 - Signals/Lights
     data.leftTurn.encode(frame601);
@@ -22,12 +23,12 @@ void CANIODataEncoder::sendFrame(VehicleData& data, CANBus& _canBus) {
     data.highBeam.encode(frame601);
     data.headlights.encode(frame601);
     _canBus.sendMessage(0x601, frame601, 8);
-    delayMicroseconds(500);
+    delayMicroseconds(2);
 
     // 0x602 - Speed
     data.speed.encode(frame602);
     _canBus.sendMessage(0x602, frame602, 8);
-    delayMicroseconds(500);
+    delayMicroseconds(2);
 
     // 0x603 - Buttons
     data.button0.encode(frame603);
