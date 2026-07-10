@@ -158,7 +158,7 @@ void updateInputs()
 
 void transmitVehicleData()
 {
-  if (xSemaphoreTake(vehicleDataMutex, pdMS_TO_TICKS(10)) == pdTRUE)
+  if (xSemaphoreTake(vehicleDataMutex, pdMS_TO_TICKS(50)) == pdTRUE)
   {
     vehicleOutputData = vehicleDataOutputBuffer;
     xSemaphoreGive(vehicleDataMutex);
