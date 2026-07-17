@@ -26,7 +26,9 @@ MCP3204 adc;
 SemaphoreHandle_t vehicleDataMutex = NULL;
 static portMUX_TYPE vssMux = portMUX_INITIALIZER_UNLOCKED;
 
+// Function Prototypes
 void updateInputs();
+void updateOutputs();
 uint16_t calculateSpeedFromVss();
 float emaFilter(float newValue, float prevEma, float alpha);
 float measureFuel();
@@ -60,6 +62,9 @@ void canTask(void *param)
     while (canBus.receiveMessage(msg))
     {
       hasIncomingData = true;
+
+      // If you are using your new ID-based self-decoding VehicleData here,
+      // you would change this block to check your ID map/registry:
       if (msg.identifier >= 0x5E8 && msg.identifier <= 0x5EA)
       {
         msDecoder.processFrame(msg);
@@ -75,7 +80,6 @@ void canTask(void *param)
     {
       if (xSemaphoreTake(vehicleDataMutex, pdMS_TO_TICKS(1)) == pdTRUE)
       {
-
         // Swap Incoming data to Core 1 if needed
         if (hasIncomingData)
         {
@@ -131,6 +135,10 @@ void setup()
   pinMode(BUTTON_0_GPIO, INPUT);
   pinMode(BUTTON_1_GPIO, INPUT);
 
+  // Configure GPIO pins for digital outputs
+  pinMode(SHIFT_LED_GPIO, OUTPUT);
+  digitalWrite(SHIFT_LED_GPIO, LOW);
+
   // Initialize MCP3204 ADC
   SPI.begin();
   adc.begin(SPI_CS);
@@ -146,16 +154,17 @@ void setup()
   Serial.println("Setup complete");
 }
 
-// ----------------- SENSOR ACQUISITION LOOP (CORE 1) -----------------
+// ----------------- SENSOR ACQUISITION & CONTROL LOOP (CORE 1) -----------------
 void loop()
 {
   unsigned long now = millis();
 
-  // Poll your raw analog and digital inputs at a fixed rate
+  // Poll your raw analog and digital inputs, and update outputs at a fixed rate
   if (now - lastPollMillis >= POLLING_RATE_MS)
   {
     lastPollMillis = now;
-    updateInputs();
+    updateInputs();  // Read local physical pins -> Write to vehicleOutputData
+    updateOutputs(); // Read vehicleInputDataReadBuffer -> Control physical pins
   }
 
   // Output diagnostics to Serial at a fixed rate (200ms)
@@ -172,7 +181,7 @@ void updateInputs()
 {
   // 1. Gather all inputs onto Core 1 stack safely without locking anything
   bool right = digitalRead(RIGHT_TURN_SIGNAL_GPIO);
-  bool left = digitalRead(LEFT_TURN_SIGNAL_GPIO);  //Hardcoded to true for testing
+  bool left = digitalRead(LEFT_TURN_SIGNAL_GPIO);
   bool high = digitalRead(HIGH_BEAM_GPIO);
   bool head = digitalRead(HEADLIGHTS_GPIO);
   uint16_t spd = calculateSpeedFromVss();
@@ -195,6 +204,38 @@ void updateInputs()
   }
 }
 
+void updateOutputs()
+{
+  // Local stack copy of our incoming data to avoid holding the lock
+  VehicleData inputSnapshot;
+
+  // 1. Lock and grab a fast snapshot of incoming data from Megasquirt
+  if (vehicleDataMutex != NULL)
+  {
+    if (xSemaphoreTake(vehicleDataMutex, pdMS_TO_TICKS(2)) == pdTRUE)
+    {
+      inputSnapshot = vehicleInputDataReadBuffer;
+      xSemaphoreGive(vehicleDataMutex);
+    }
+    else
+    {
+      // If the mutex is momentarily busy, skip this tick to keep loop responsive
+      return;
+    }
+  }
+
+  // 2. Execute local control logic based on Megasquirt data
+  // (Assumes 'rpm' is defined in your VehicleData structure)
+  if (inputSnapshot.rpm.value >= SHIFT_RPM_THRESHOLD)
+  {
+    digitalWrite(SHIFT_LED_GPIO, HIGH);
+  }
+  else
+  {
+    digitalWrite(SHIFT_LED_GPIO, LOW);
+  }
+}
+
 uint16_t calculateSpeedFromVss()
 {
   static uint32_t lastSpeedCalculationMillis = 0;
@@ -209,7 +250,11 @@ uint16_t calculateSpeedFromVss()
     vssPulseCount = 0;
     portEXIT_CRITICAL(&vssMux);
 
-    speed = (currentCount * 1000UL) / deltaTime;
+    // Calculate the speed in mph
+    float pulsesPerMillisecond = (float)currentCount / (float)deltaTime;
+    float pulsesPerHour = pulsesPerMillisecond * 3600000.0;
+
+    speed = (uint16_t)(pulsesPerHour / (float)PULSES_PER_MILE);
   }
   lastSpeedCalculationMillis = now;
   return speed;

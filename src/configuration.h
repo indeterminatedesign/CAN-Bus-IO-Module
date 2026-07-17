@@ -2,10 +2,15 @@
 #define CAN_TX 4   // Physical pin for CAN TX
 #define CAN_RX 5    // Physical pin for CAN RX
 
+#define PULSES_PER_MILE 4000  //This is the number of pulses per Mile that is expected from the vehicle speed sensor
+
 #define SPI_CS    	10 		   // SPI slave select
 #define ADC_VREF    3300     // 3.3V Vref
 #define ADC_CLK     1600000  // SPI clock 1.6MHz
 #define SPLS        128      // samples
+
+#define SHIFT_LED_GPIO 13       // Replace with your actual LED pin
+#define SHIFT_RPM_THRESHOLD 6000 // RPM turning point for the shift light
 
 // Interval:
 #define TRANSMIT_RATE_MS 50  //Rate we transmit CAN BUS data
