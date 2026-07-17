@@ -7,7 +7,6 @@
 #include <SPI.h>
 #include "MCP_ADC.h"
 #include <freertos/FreeRTOS.h>
-#include <freertos/semphr.h>
 #include "CAN_BUS/MegasquirtDecoder.h"
 
 // Buffers used exclusively by Core 1 (Polling & Diagnostics)
