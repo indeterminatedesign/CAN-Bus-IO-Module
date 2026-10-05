@@ -8,6 +8,9 @@
 #include "MCP_ADC.h"
 #include <freertos/FreeRTOS.h>
 #include "CAN_BUS/MegasquirtDecoder.h"
+#include "ShiftLight/ShiftLight.h"
+#include "OdometerSpeedometer/Speedometer.h"
+#include "FuelGauge/FuelGauge.h"
 
 // Buffers used exclusively by Core 1 (Polling & Diagnostics)
 VehicleData vehicleOutputData;
@@ -21,27 +24,25 @@ CANBus canBus;
 CANIODataEncoder ioEncoder;
 MegasquirtDecoder msDecoder(vehicleInputData);
 MCP3204 adc;
+ShiftLight shiftLight;
+Speedometer speedometer;
+FuelGauge fuelGauge(adc, FUEL_LEVEL_CHANNEL, 0.01f); // 1% smoothing factor
 
 SemaphoreHandle_t vehicleDataMutex = NULL;
-static portMUX_TYPE vssMux = portMUX_INITIALIZER_UNLOCKED;
 
 // Function Prototypes
 void updateInputs();
 void updateOutputs();
-uint16_t calculateSpeedFromVss();
 float emaFilter(float newValue, float prevEma, float alpha);
 float measureFuel();
 void printDiagnostics();
 
-volatile uint32_t vssPulseCount = 0;
 unsigned long lastPollMillis = 0;
 unsigned long lastDiagnosticsMillis = 0;
 
 void IRAM_ATTR onVssPulse()
 {
-  portENTER_CRITICAL_ISR(&vssMux);
-  vssPulseCount += 1;
-  portEXIT_CRITICAL_ISR(&vssMux);
+  speedometer.incrementPulseCount();
 }
 
 // ----------------- CAN TRANSMIT/RECEIVE TASK (CORE 0) -----------------
@@ -62,8 +63,6 @@ void canTask(void *param)
     {
       hasIncomingData = true;
 
-      // If you are using your new ID-based self-decoding VehicleData here,
-      // you would change this block to check your ID map/registry:
       if (msg.identifier >= 0x5E8 && msg.identifier <= 0x5EA)
       {
         msDecoder.processFrame(msg);
@@ -90,7 +89,6 @@ void canTask(void *param)
         {
           vehicleDataOutputBuffer = vehicleOutputData;
         }
-
         xSemaphoreGive(vehicleDataMutex);
       }
     }
@@ -142,6 +140,12 @@ void setup()
   SPI.begin();
   adc.begin(SPI_CS);
 
+  // Start shift Light
+  shiftLight.begin();
+
+  // Initial Fuel Reading
+  fuelGauge.begin();
+
   // Setup interrupt for VSS pulse counting
   pinMode(VSS_GPIO, INPUT);
   attachInterrupt(VSS_GPIO, onVssPulse, RISING);
@@ -183,8 +187,8 @@ void updateInputs()
   bool left = digitalRead(LEFT_TURN_SIGNAL_GPIO);
   bool high = digitalRead(HIGH_BEAM_GPIO);
   bool head = digitalRead(HEADLIGHTS_GPIO);
-  uint16_t spd = calculateSpeedFromVss();
-  float fuel = measureFuel();
+  uint16_t spd = speedometer.getSpeed();
+  float fuel = fuelGauge.update();
   bool b0 = digitalRead(BUTTON_0_GPIO);
   bool b1 = digitalRead(BUTTON_1_GPIO);
 
@@ -223,54 +227,8 @@ void updateOutputs()
     }
   }
 
-  // 2. Execute local control logic based on Megasquirt data
-  // (Assumes 'rpm' is defined in your VehicleData structure)
-  if (inputSnapshot.rpm.value >= SHIFT_RPM_THRESHOLD)
-  {
-    digitalWrite(SHIFT_LED_GPIO, HIGH);
-  }
-  else
-  {
-    digitalWrite(SHIFT_LED_GPIO, LOW);
-  }
-}
-
-uint16_t calculateSpeedFromVss()
-{
-  static uint32_t lastSpeedCalculationMillis = 0;
-  uint16_t speed = 0;
-  uint32_t now = millis();
-  uint32_t deltaTime = now - lastSpeedCalculationMillis;
-
-  if (deltaTime > 0)
-  {
-    portENTER_CRITICAL(&vssMux);
-    uint32_t currentCount = vssPulseCount;
-    vssPulseCount = 0;
-    portEXIT_CRITICAL(&vssMux);
-
-    // Calculate the speed in mph
-    float pulsesPerMillisecond = (float)currentCount / (float)deltaTime;
-    float pulsesPerHour = pulsesPerMillisecond * 3600000.0;
-
-    speed = (uint16_t)(pulsesPerHour / (float)PULSES_PER_MILE);
-  }
-  lastSpeedCalculationMillis = now;
-  return speed;
-}
-
-float measureFuel()
-{
-  static float lastFuelLevel = 0.0f;
-  uint16_t rawAdc = adc.read(FUEL_LEVEL_CHANNEL);
-  float filtered = emaFilter((float)rawAdc, lastFuelLevel, 0.01f);
-  lastFuelLevel = filtered;
-  return constrain((filtered / 4095.0f) * 100.0f, 0.0f, 100.0f);
-}
-
-float emaFilter(float newValue, float prevEma, float alpha)
-{
-  return (alpha * newValue) + ((1.0f - alpha) * prevEma);
+  // 2. Update physical outputs based on the snapshot
+  shiftLight.updateRPM(inputSnapshot.rpm.value);
 }
 
 void printDiagnostics()

@@ -1,8 +1,22 @@
 
+#pragma once
+
+#ifndef CONFIGURATION_H
+#define CONFIGURATION_H
+
 #define CAN_TX 4   // Physical pin for CAN TX
 #define CAN_RX 5    // Physical pin for CAN RX
 
-#define PULSES_PER_MILE 4000  //This is the number of pulses per Mile that is expected from the vehicle speed sensor
+// Shift Light Configuration
+#define NUM_LEDS 14
+#ifndef LED_DATA_PIN
+#define LED_DATA_PIN 18
+#endif
+
+#define PULSES_PER_MILE 4000  // This is the number of pulses per Mile expected from the vehicle speed sensor
+#define SPEED_CALCULATION_INTERVAL_MS 500 // Interval for speed calculation in milliseconds
+
+#endif // CONFIGURATION_H
 
 #define SPI_CS    	10 		   // SPI slave select
 #define ADC_VREF    3300     // 3.3V Vref
@@ -13,9 +27,9 @@
 #define SHIFT_RPM_THRESHOLD 6000 // RPM turning point for the shift light
 
 // Interval:
-#define TRANSMIT_RATE_MS 50  //Rate we transmit CAN BUS data
-#define POLLING_RATE_MS 50 //Rate we poll digital and analog inputs
-#define RECEIVE_RATE_MS 50 //Rate we receive CAN BUS data
+#define TRANSMIT_RATE_MS 20  //Rate we transmit CAN BUS data in milliseconds
+#define POLLING_RATE_MS 20 //Rate we poll digital and analog inputs in milliseconds
+#define RECEIVE_RATE_MS 20 //Rate we receive CAN BUS data in milliseconds
 
 //Mapping of physical ESP32 pins to digital GPIOs for CAN IO Board
 #define DIGITAL0_GPIO 1
