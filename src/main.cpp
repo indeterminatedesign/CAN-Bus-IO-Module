@@ -26,15 +26,13 @@ MegasquirtDecoder msDecoder(vehicleInputData);
 MCP3204 adc;
 ShiftLight shiftLight;
 Speedometer speedometer;
-FuelGauge fuelGauge(adc, FUEL_LEVEL_CHANNEL, 0.01f); // 1% smoothing factor
+FuelGauge fuelGauge(adc, FUEL_LEVEL_CHANNEL, 0.001f); // 0.1% smoothing factor
 
 SemaphoreHandle_t vehicleDataMutex = NULL;
 
 // Function Prototypes
 void updateInputs();
 void updateOutputs();
-float emaFilter(float newValue, float prevEma, float alpha);
-float measureFuel();
 void printDiagnostics();
 
 unsigned long lastPollMillis = 0;
