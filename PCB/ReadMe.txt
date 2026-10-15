@@ -1,0 +1,1 @@
+This is the EasyEDA Pro File that I used to design the PCB.  You can download EasyEDA Pro for free and export GERBER files as needed for PCB fabrication.  Note the PCB uses either the included 5V buck converter or Matek 12s BEC 6-60V to 5V/9V/12V Step-Down Voltage Regulator 
