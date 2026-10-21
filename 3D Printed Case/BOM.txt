@@ -1,0 +1,5 @@
+I hope I get all this right:
+8x M3 Heatset inserts 5-6mm length
+4x M3x25 or 30mm socket head screws for the case halves
+4x M3x8 socket head screws for PCB to case 
+4x M2.5 screws about 5mm or so long, tapered head or button head.  For TE connector to the face plate
