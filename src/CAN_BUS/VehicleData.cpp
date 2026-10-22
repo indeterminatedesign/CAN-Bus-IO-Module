@@ -16,6 +16,7 @@ VehicleData::VehicleData()
       headlights(0x601, 3, 1.0f, 0.0f, 0.0f, CANDataType::BOOL),
       speed(0x602, 0, 1.0f, 0.0f, 0.0f, CANDataType::U16),
       button0(0x603, 0, 1.0f, 0.0f, 0.0f, CANDataType::BOOL),
-      button1(0x603, 1, 1.0f, 0.0f, 0.0f, CANDataType::BOOL)
+      button1(0x603, 1, 1.0f, 0.0f, 0.0f, CANDataType::BOOL),
+      odometer(0x604, 0, 1.0f, 0.0f, 0.0f, CANDataType::U32)
 {
 }

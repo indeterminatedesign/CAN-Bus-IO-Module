@@ -11,6 +11,7 @@ void CANIODataEncoder::sendFrame(VehicleData& data, CANBus& _canBus) {
     uint8_t frame601[8] = {0};
     uint8_t frame602[8] = {0};
     uint8_t frame603[8] = {0};
+    uint8_t frame604[8] = {0};
 
     // 0x600 - Fuel
     data.fuelLevel.encode(frame600);
@@ -34,4 +35,8 @@ void CANIODataEncoder::sendFrame(VehicleData& data, CANBus& _canBus) {
     data.button0.encode(frame603);
     data.button1.encode(frame603);
     _canBus.sendMessage(0x603, frame603, 8);
+
+    // 0x604 - Odometer in hundredths of a mile
+    data.odometer.encode(frame604);
+    _canBus.sendMessage(0x604, frame604, 8);
 }

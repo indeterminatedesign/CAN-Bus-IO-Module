@@ -9,7 +9,8 @@ enum class CANDataType
     BOOL, ///< Boolean value (0 or 1)
     U16,  ///< Unsigned 16-bit integer
     S16,  ///< Signed 16-bit integer
-    U8    // Unsigned byte
+    U8,   ///< Unsigned byte
+    U32   ///< Unsigned 32-bit integer
 };
 
 /**
@@ -21,7 +22,7 @@ class CANDataField
 {
 public:
     CANDataType canDatatype; ///< The underlying data format in the CAN frame
-    float_t value = 0;       ///< The processed physical value (scaled)
+    double value = 0;         ///< The processed physical value (scaled)
     uint32_t lastUpdate = 0; ///< Timestamp (ms) of the last successful decode
 
     // CAN mapping
@@ -37,7 +38,7 @@ public:
      * @param off The starting byte position (0-7) within the CAN frame.
      * @param scl The scaling factor applied to the raw value.
      * @param tolerance The delta threshold for UI updates.
-     * @param t The data type (U16, S16, or Float).
+     * @param t The data type used to encode or decode the field.
      */
     CANDataField(uint32_t id = 0, uint8_t off = 0, float scl = 1.0f, float tolerance = 1.0f,float bias = 0.0f, CANDataType t = CANDataType::U16)
         : canId(id),

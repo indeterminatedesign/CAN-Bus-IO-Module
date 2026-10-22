@@ -10,6 +10,7 @@
 #include "CAN_BUS/MegasquirtDecoder.h"
 #include "ShiftLight/ShiftLight.h"
 #include "OdometerSpeedometer/Speedometer.h"
+#include "OdometerSpeedometer/Odometer.h"
 #include "FuelGauge/FuelGauge.h"
 
 // Buffers used exclusively by Core 1 (Polling & Diagnostics)
@@ -26,6 +27,7 @@ MegasquirtDecoder msDecoder(vehicleInputData);
 MCP3204 adc;
 ShiftLight shiftLight;
 Speedometer speedometer;
+Odometer odometer;
 FuelGauge fuelGauge(adc, FUEL_LEVEL_CHANNEL, 0.001f); // 0.1% smoothing factor
 
 SemaphoreHandle_t vehicleDataMutex = NULL;
@@ -41,6 +43,7 @@ unsigned long lastDiagnosticsMillis = 0;
 void IRAM_ATTR onVssPulse()
 {
   speedometer.incrementPulseCount();
+  odometer.incrementPulseCount();
 }
 
 // ----------------- CAN TRANSMIT/RECEIVE TASK (CORE 0) -----------------
@@ -146,6 +149,10 @@ void setup()
 
   // Setup interrupt for VSS pulse counting
   pinMode(VSS_GPIO, INPUT);
+  if (!odometer.begin())
+  {
+    Serial.println("WARNING: Odometer will be volatile and will reset after power loss.");
+  }
   attachInterrupt(VSS_GPIO, onVssPulse, RISING);
 
   // Launch the core CAN management task on Core 0
@@ -159,6 +166,7 @@ void setup()
 void loop()
 {
   unsigned long now = millis();
+  odometer.update();
 
   // Poll your raw analog and digital inputs, and update outputs at a fixed rate
   if (now - lastPollMillis >= POLLING_RATE_MS)
@@ -198,6 +206,7 @@ void updateInputs()
     vehicleOutputData.highBeam.value = high;
     vehicleOutputData.headlights.value = head;
     vehicleOutputData.speed.value = spd;
+    vehicleOutputData.odometer.value = odometer.getHundredthsOfMiles();
     vehicleOutputData.fuelLevel.value = fuel;
     vehicleOutputData.button0.value = b0;
     vehicleOutputData.button1.value = b1;

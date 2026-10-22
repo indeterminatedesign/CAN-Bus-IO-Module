@@ -24,6 +24,7 @@ public:
     CANDataField speed;
     CANDataField button0;
     CANDataField button1;
+    CANDataField odometer;
 
     VehicleData();
 

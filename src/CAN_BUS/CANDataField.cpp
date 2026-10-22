@@ -1,35 +1,41 @@
 #include "CANDataField.h"
+#include <limits>
 
 /**
  * @brief Decodes raw CAN data into the processed 'value' field.
- * * This method extracts two bytes starting at 'offset' (Big-Endian),
- * casts them based on 'type', applies the 'scale', and updates the timestamp.
- * * @note When using CANDataType::Float, ensure the raw data actually fits
- * into the 16 bits extracted, otherwise, pointer aliasing may cause undefined behavior.
+ * Raw multi-byte values are extracted in big-endian order and scaled.
  * * @param data Pointer to the 8-byte CAN data array.
  */
 void CANDataField::decode(const uint8_t *data)
 {
-    float raw;
+    double raw = 0;
     switch (canDatatype)
     {
     case CANDataType::BOOL:
-        value = (data[offset] != 0) ? 1 : 0;
+        raw = (data[offset] != 0) ? 1 : 0;
         break;
     case CANDataType::S16:
     {
-        raw = (int16_t)((data[offset] << 8) | data[offset + 1]);
-        value = ((int16_t)raw) * scale;
+        raw = static_cast<int16_t>(
+            (static_cast<uint16_t>(data[offset]) << 8) | data[offset + 1]);
         break;
     }
     case CANDataType::U16:
     {
-        raw = (data[offset] << 8) | data[offset + 1];
+        raw = (static_cast<uint16_t>(data[offset]) << 8) | data[offset + 1];
         break;
     }
     case CANDataType::U8:
     {
         raw = data[offset];
+        break;
+    }
+    case CANDataType::U32:
+    {
+        raw = (static_cast<uint32_t>(data[offset]) << 24) |
+              (static_cast<uint32_t>(data[offset + 1]) << 16) |
+              (static_cast<uint32_t>(data[offset + 2]) << 8) |
+              static_cast<uint32_t>(data[offset + 3]);
         break;
     }
     }
@@ -70,6 +76,21 @@ void CANDataField::encode(uint8_t *data)
         // Subtract bias first, then divide by scale
         uint8_t raw = (uint8_t)((value - sensorBias) / scale);
         data[offset] = raw;
+        break;
+    }
+
+    case CANDataType::U32:
+    {
+        const double scaledValue = (value - sensorBias) / scale;
+        const uint32_t raw = scaledValue <= 0
+                                 ? 0
+                                 : scaledValue >= std::numeric_limits<uint32_t>::max()
+                                       ? std::numeric_limits<uint32_t>::max()
+                                       : static_cast<uint32_t>(scaledValue);
+        data[offset] = (raw >> 24) & 0xFF;
+        data[offset + 1] = (raw >> 16) & 0xFF;
+        data[offset + 2] = (raw >> 8) & 0xFF;
+        data[offset + 3] = raw & 0xFF;
         break;
     }
     }

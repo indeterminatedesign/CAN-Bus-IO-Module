@@ -15,6 +15,8 @@
 
 #define PULSES_PER_MILE 4000  // This is the number of pulses per Mile expected from the vehicle speed sensor
 #define SPEED_CALCULATION_INTERVAL_MS 500 // Interval for speed calculation in milliseconds
+#define ODOMETER_SAVE_INTERVAL_MILES 1 // Persist odometer after each traveled mile
+#define ODOMETER_SAVE_RETRY_INTERVAL_MS 60000 // Retry failed NVS writes no more than once per minute
 
 #endif // CONFIGURATION_H
 
@@ -66,4 +68,3 @@
 // Fuel level calculation constants (To be calibrated based on actual vehicle data)
 #define FUEL_LEVEL_MAX 254
 #define FUEL_LEVEL_RANGE 346
-
